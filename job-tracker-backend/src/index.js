@@ -102,12 +102,16 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 4000;
-const server = app.listen(PORT, () => {
-  console.log('');
-  console.log('Job Tracker running at http://localhost:' + PORT);
-  console.log('API health: http://localhost:' + PORT + '/api/health');
-  console.log('Env:', process.env.NODE_ENV || 'development');
-  console.log('');
-});
+let server;
+if (require.main === module) {
+  server = app.listen(PORT, () => {
+    console.log('');
+    console.log('Job Tracker running at http://localhost:' + PORT);
+    console.log('API health: http://localhost:' + PORT + '/api/health');
+    console.log('Env:', process.env.NODE_ENV || 'development');
+    console.log('');
+  });
+  process.on('SIGTERM', () => { server.close(() => process.exit(0)); });
+}
 
-process.on('SIGTERM', () => { server.close(() => process.exit(0)); });
+module.exports = app;

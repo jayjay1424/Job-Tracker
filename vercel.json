@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "buildCommand": "npm install --prefix job-tracker-frontend && npm run build --prefix job-tracker-frontend && npm install --prefix job-tracker-backend && npx prisma generate --schema=job-tracker-backend/prisma/schema.prisma",
+  "outputDirectory": "job-tracker-frontend/dist",
+  "installCommand": "npm install --prefix job-tracker-backend && npm install --prefix job-tracker-frontend",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/job-tracker-backend/api/index.js" },
+    { "source": "/assets/(.*)", "destination": "/job-tracker-frontend/dist/assets/$1" },
+    { "source": "/(.*)", "destination": "/job-tracker-backend/api/index.js" }
+  ],
+  "functions": {
+    "job-tracker-backend/api/index.js": {
+      "includeFiles": "job-tracker-frontend/dist/**"
+    }
+  }
+}
