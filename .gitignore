@@ -1,0 +1,53 @@
+# Dependencies
+node_modules/
+job-tracker-backend/node_modules/
+job-tracker-frontend/node_modules/
+job-tracker-frontend/dist/
+job-tracker-frontend/dist-ssr/
+
+# Env
+job-tracker-backend/.env
+*.env
+!.env.example
+job-tracker-backend/.env.local
+job-tracker-frontend/.env
+job-tracker-frontend/.env.local
+
+# Database
+job-tracker-backend/prisma/dev.db
+job-tracker-backend/prisma/dev.db-journal
+job-tracker-backend/dev.db
+job-tracker-backend/src/prisma/dev.db
+job-tracker-backend/*.db
+*.db
+*.db-journal
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+backend-trace.log
+live-test.log
+server.log
+verify.log
+verify-final.log
+backend-run.log
+frontend-test.log
+
+# OS
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.vscode/*
+!.vscode/extensions.json
+
+# Vercel
+.vercel
+
+# Coverage
+coverage/
