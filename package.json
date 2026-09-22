@@ -1,0 +1,9 @@
+{
+  "name": "job-tracker-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "npm run build --prefix job-tracker-frontend && npm run db:generate --prefix job-tracker-backend",
+    "install:all": "npm install --prefix job-tracker-backend && npm install --prefix job-tracker-frontend"
+  }
+}
