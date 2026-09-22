@@ -1,17 +1,30 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { DndContext, DragOverlay, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, useDroppable } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDroppable,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { api } from '../api';
 
 const STATUS_COLUMNS = [
-  { id: 'WISHLIST', label: 'Wishlist', color: '#6b7280' },
-  { id: 'APPLIED', label: 'Applied', color: '#3b82f6' },
-  { id: 'INTERVIEW', label: 'Interview', color: '#f59e0b' },
-  { id: 'OFFER', label: 'Offer', color: '#10b981' },
-  { id: 'REJECTED', label: 'Rejected', color: '#ef4444' },
-  { id: 'WITHDRAWN', label: 'Withdrawn', color: '#9ca3af' },
+  { id: 'WISHLIST', label: 'Wishlist', color: '#64748b', bgLight: '#f1f5f9', borderLight: '#cbd5e1' },
+  { id: 'APPLIED', label: 'Applied', color: '#0284c7', bgLight: '#f0f9ff', borderLight: '#bae6fd' },
+  { id: 'INTERVIEW', label: 'Interview', color: '#d97706', bgLight: '#fffbeb', borderLight: '#fde68a' },
+  { id: 'OFFER', label: 'Offer', color: '#16a34a', bgLight: '#f0fdf4', borderLight: '#bbf7d0' },
+  { id: 'REJECTED', label: 'Rejected', color: '#dc2626', bgLight: '#fef2f2', borderLight: '#fecaca' },
+  { id: 'WITHDRAWN', label: 'Withdrawn', color: '#94a3b8', bgLight: '#f8fafc', borderLight: '#e2e8f0' },
 ];
 
 export default function Board() {
@@ -19,6 +32,7 @@ export default function Board() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeId, setActiveId] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -58,7 +72,7 @@ export default function Board() {
     const draggedApp = applications.find((a) => a.id === draggedId);
     if (!draggedApp) return;
 
-    // overId can be a column id (WISHLIST etc.) or a card id
+    // overId can be a column id (WISHLIST etc.) or another card id
     let newStatus = overId;
     const isColumn = STATUS_COLUMNS.some((c) => c.id === overId);
     if (!isColumn) {
@@ -96,73 +110,147 @@ export default function Board() {
     }
   };
 
+  // Filter applications by search term
+  const filteredApplications = useMemo(() => {
+    if (!searchQuery.trim()) return applications;
+    const query = searchQuery.toLowerCase();
+    return applications.filter(
+      (app) =>
+        app.company?.toLowerCase().includes(query) ||
+        app.jobTitle?.toLowerCase().includes(query) ||
+        app.location?.toLowerCase().includes(query)
+    );
+  }, [applications, searchQuery]);
+
   // Group applications by status
-  const grouped = STATUS_COLUMNS.reduce((acc, col) => {
-    acc[col.id] = applications.filter((a) => a.status === col.id);
-    return acc;
-  }, {});
+  const grouped = useMemo(() => {
+    return STATUS_COLUMNS.reduce((acc, col) => {
+      acc[col.id] = filteredApplications.filter((a) => a.status === col.id);
+      return acc;
+    }, {});
+  }, [filteredApplications]);
 
   const activeApplication = applications.find((a) => a.id === activeId);
 
+  // High-level pipeline counts
+  const totalCount = applications.length;
+  const activeInterviews = applications.filter((a) => a.status === 'INTERVIEW').length;
+  const offersCount = applications.filter((a) => a.status === 'OFFER').length;
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-semibold text-gray-900">Board</h2>
-        <div className="flex items-center gap-2">
-          <a
-            href="/applications/new"
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition"
-          >
-            <span className="text-base leading-none">+</span> Add Application
-          </a>
-          <button
-            onClick={fetchApplications}
-            className="text-sm text-primary-600 hover:text-primary-700 font-medium px-2 py-1.5"
-          >
-            Refresh
-          </button>
+    <div className="space-y-5">
+      {/* Header & Control Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/80">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Application Pipeline</h1>
+            <span className="bg-slate-100 text-slate-700 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-slate-200">
+              {totalCount} Total
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 mt-1">
+            Drag cards across columns or use single-tap status selectors to update progress.
+          </p>
         </div>
-      </div>
 
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">
-          {error}
-        </div>
-      )}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Quick Stats Badges */}
+          <div className="hidden lg:flex items-center gap-2 mr-2">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 border border-amber-200/70 rounded-lg text-xs font-medium text-amber-800">
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+              <span>{activeInterviews} Interviewing</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200/70 rounded-lg text-xs font-medium text-emerald-800">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span>{offersCount} Offers</span>
+            </div>
+          </div>
 
-      {loading ? (
-        <div className="flex justify-center py-20">
-          <div className="spinner" />
-        </div>
-      ) : applications.length === 0 ? (
-        <div className="text-center py-20">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          {/* Search Box */}
+          <div className="relative flex-1 sm:w-60">
             <svg
-              className="w-8 h-8 text-gray-400"
+              className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-              />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Filter company, role..."
+              className="w-full pl-9 pr-7 py-1.5 text-xs bg-white border border-slate-300 rounded-lg placeholder-slate-400 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition outline-none"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                aria-label="Clear filter"
+              >
+                &times;
+              </button>
+            )}
+          </div>
+
+          <button
+            onClick={fetchApplications}
+            disabled={loading}
+            className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg shadow-subtle transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            title="Refresh pipeline"
+          >
+            <svg className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </button>
+
+          <Link
+            to="/applications/new"
+            className="px-3.5 py-1.5 bg-primary-700 hover:bg-primary-800 text-white text-xs font-semibold rounded-lg shadow-sm transition flex items-center gap-1.5 cursor-pointer"
+          >
+            <span className="text-sm font-bold leading-none">+</span> Add Application
+          </Link>
+        </div>
+      </div>
+
+      {error && (
+        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs rounded-xl flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-rose-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{error}</span>
+          </div>
+          <button onClick={() => setError('')} className="text-rose-500 hover:text-rose-700 font-bold ml-2">
+            &times;
+          </button>
+        </div>
+      )}
+
+      {loading && applications.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-slate-400">
+          <div className="spinner mb-3" />
+          <p className="text-sm font-medium">Loading pipeline data…</p>
+        </div>
+      ) : applications.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center max-w-md mx-auto shadow-subtle my-8">
+          <div className="w-14 h-14 bg-sky-50 text-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-sky-100">
+            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
             </svg>
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            No applications yet
-          </h3>
-          <p className="text-gray-500 mb-4">
-            Start tracking your job applications by creating one.
+          <h2 className="text-lg font-bold text-slate-900 mb-1">Your Board is Empty</h2>
+          <p className="text-xs text-slate-500 mb-5 leading-relaxed">
+            Start tracking your interviews, wishlist roles, and offers with structured kanban stages.
           </p>
-          <a
-            href="/applications/new"
-            className="inline-block bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition font-medium"
+          <Link
+            to="/applications/new"
+            className="inline-flex items-center gap-2 bg-primary-700 hover:bg-primary-800 text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-sm transition"
           >
-            Create Application
-          </a>
+            Create First Application
+          </Link>
         </div>
       ) : (
         <DndContext
@@ -171,8 +259,8 @@ export default function Board() {
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          {/* No scrollbar — use available width + vertical space (2 rows on desktop) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Kanban Columns Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5 items-start">
             {STATUS_COLUMNS.map((column) => (
               <Column
                 key={column.id}
@@ -186,11 +274,11 @@ export default function Board() {
 
           <DragOverlay>
             {activeApplication && (
-              <div className="bg-white rounded-lg shadow-xl p-3 border border-gray-200">
-                <div className="font-medium text-gray-900 truncate">
+              <div className="bg-white rounded-xl shadow-card-hover p-3.5 border-2 border-primary-500 scale-105 rotate-1 opacity-95">
+                <div className="font-semibold text-xs text-slate-900 truncate">
                   {activeApplication.company}
                 </div>
-                <div className="text-sm text-gray-500 truncate">
+                <div className="text-[11px] text-slate-500 truncate mt-0.5">
                   {activeApplication.jobTitle}
                 </div>
               </div>
@@ -210,9 +298,9 @@ function Column({ column, applications, onStatusChange, onCreated }) {
   const [err, setErr] = useState('');
 
   const handleQuickAdd = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     if (!form.company.trim() || !form.jobTitle.trim()) {
-      setErr('Company and Job Title required');
+      setErr('Company and Title are required');
       return;
     }
     setSubmitting(true);
@@ -234,67 +322,88 @@ function Column({ column, applications, onStatusChange, onCreated }) {
     }
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Escape') {
+      setShowForm(false);
+      setErr('');
+    }
+  };
+
   return (
     <div
       ref={setNodeRef}
-      className={`bg-gray-50 rounded-xl p-3 border min-h-[260px] flex flex-col transition ${
-        isOver ? 'border-primary-300 bg-primary-50/50' : 'border-gray-200'
+      className={`rounded-2xl p-2.5 border transition-all duration-150 flex flex-col min-h-[300px] ${
+        isOver
+          ? 'bg-sky-50/80 border-primary-400 ring-2 ring-primary-300 ring-offset-1'
+          : 'bg-slate-100/70 border-slate-200/90'
       }`}
     >
-      <div className="flex items-center gap-2 mb-3 px-1">
-        <div
-          className="w-3 h-3 rounded-full"
-          style={{ backgroundColor: column.color }}
-        />
-        <h3 className="font-medium text-gray-700 text-sm">{column.label}</h3>
-        <span className="text-xs text-gray-400 bg-white px-2 py-0.5 rounded-full border">
+      {/* Column Header */}
+      <div className="flex items-center justify-between gap-1 mb-2.5 px-1 pt-0.5">
+        <div className="flex items-center gap-2">
+          <span
+            className="w-2.5 h-2.5 rounded-full ring-2 ring-white shadow-xs shrink-0"
+            style={{ backgroundColor: column.color }}
+          />
+          <h2 className="font-semibold text-slate-800 text-xs tracking-tight">
+            {column.label}
+          </h2>
+        </div>
+        <span
+          className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white border border-slate-200/90 text-slate-600 shadow-subtle"
+          title={`${applications.length} applications in ${column.label}`}
+        >
           {applications.length}
         </span>
       </div>
 
+      {/* Cards List */}
       <SortableContext
         items={applications.map((a) => a.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="space-y-2 min-h-[40px] flex-1">
+        <div className="space-y-2 min-h-[50px] flex-1">
           {applications.map((app) => (
             <SortableCard
               key={app.id}
               application={app}
+              column={column}
               onStatusChange={onStatusChange}
             />
           ))}
+
+          {applications.length === 0 && !showForm && (
+            <div className="border border-dashed border-slate-300/80 rounded-xl py-6 px-3 text-center">
+              <p className="text-[11px] text-slate-400 font-medium">Empty stage</p>
+            </div>
+          )}
         </div>
       </SortableContext>
 
-      {applications.length === 0 && !showForm && (
-        <div className="text-center py-4 text-gray-400 text-sm">
-          No applications
-        </div>
-      )}
-
+      {/* Quick Add Form or Trigger */}
       {showForm ? (
         <form
           onSubmit={handleQuickAdd}
+          onKeyDown={handleKeyDown}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
-          className="mt-3 bg-white rounded-lg border border-gray-200 p-3 space-y-2 shadow-sm"
+          className="mt-2.5 bg-white rounded-xl border border-slate-200 p-2.5 space-y-2 shadow-card"
         >
           <input
             autoFocus
             type="text"
-            placeholder="Company *"
+            placeholder="Company name *"
             value={form.company}
             onChange={(e) => setForm((p) => ({ ...p, company: e.target.value }))}
-            className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+            className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
             required
           />
           <input
             type="text"
-            placeholder="Job Title *"
+            placeholder="Job role / title *"
             value={form.jobTitle}
             onChange={(e) => setForm((p) => ({ ...p, jobTitle: e.target.value }))}
-            className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+            className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
             required
           />
           <input
@@ -302,14 +411,18 @@ function Column({ column, applications, onStatusChange, onCreated }) {
             placeholder="Location (optional)"
             value={form.location}
             onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))}
-            className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+            className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
           />
-          {err && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">{err}</div>}
-          <div className="flex gap-2">
+          {err && (
+            <div className="text-[11px] text-rose-600 bg-rose-50 border border-rose-100 rounded px-2 py-1">
+              {err}
+            </div>
+          )}
+          <div className="flex gap-1.5 pt-0.5">
             <button
               type="submit"
               disabled={submitting}
-              className="flex-1 py-1.5 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              className="flex-1 py-1 bg-primary-700 hover:bg-primary-800 text-white text-xs font-semibold rounded-lg shadow-xs disabled:opacity-50 transition cursor-pointer"
             >
               {submitting ? 'Adding…' : 'Add'}
             </button>
@@ -319,21 +432,18 @@ function Column({ column, applications, onStatusChange, onCreated }) {
                 setShowForm(false);
                 setErr('');
               }}
-              className="px-3 py-1.5 bg-white border border-gray-300 text-sm rounded-lg hover:bg-gray-50 transition"
+              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-medium rounded-lg transition cursor-pointer"
             >
               Cancel
             </button>
-          </div>
-          <div className="text-[11px] text-gray-400 text-center">
-            Need more fields? <a href="/applications/new" className="text-primary-600 hover:underline">Open full form</a>
           </div>
         </form>
       ) : (
         <button
           onClick={() => setShowForm(true)}
-          className="mt-3 w-full py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-white border border-dashed border-gray-300 hover:border-gray-400 rounded-lg transition flex items-center justify-center gap-1.5"
+          className="mt-2.5 w-full py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-white border border-dashed border-slate-300 hover:border-slate-400 rounded-xl transition flex items-center justify-center gap-1 cursor-pointer font-medium"
         >
-          <span className="text-base leading-none">+</span> Add card
+          <span className="text-sm leading-none font-bold">+</span> Quick add
         </button>
       )}
     </div>
@@ -353,8 +463,10 @@ function SortableCard({ application, onStatusChange }) {
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging ? 0.35 : 1,
   };
+
+  const companyInitial = (application.company?.[0] || 'C').toUpperCase();
 
   return (
     <div
@@ -362,54 +474,86 @@ function SortableCard({ application, onStatusChange }) {
       style={style}
       {...attributes}
       {...listeners}
-      className="bg-white rounded-lg border border-gray-200 p-3 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-shadow"
+      className="group bg-white rounded-xl border border-slate-200/90 p-3 shadow-card hover:shadow-card-hover transition-all duration-150 cursor-grab active:cursor-grabbing relative"
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="flex-1 min-w-0">
-          <div className="font-medium text-gray-900 truncate">
-            {application.company}
+      <div className="flex items-start justify-between gap-2 mb-1.5">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <div className="w-6 h-6 rounded-md bg-sky-100 text-primary-800 flex items-center justify-center text-[10px] font-bold shrink-0 border border-sky-200/60">
+            {companyInitial}
           </div>
-          <div className="text-sm text-gray-500 truncate">
-            {application.jobTitle}
+          <div className="min-w-0 flex-1">
+            <h3 className="font-semibold text-xs text-slate-900 truncate leading-tight">
+              {application.company}
+            </h3>
+            <p className="text-[11px] text-slate-500 truncate font-normal">
+              {application.jobTitle}
+            </p>
           </div>
         </div>
+
+        {/* Accessible Single-pointer / Keyboard alternative to dragging (WCAG 2.2 AA) */}
         <select
           value={application.status}
+          aria-label={`Change stage for ${application.company} ${application.jobTitle}`}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
           onChange={(e) => {
             e.stopPropagation();
             const newStatus = e.target.value;
-            if (newStatus !== application.status) onStatusChange(application.id, newStatus);
+            if (newStatus !== application.status) {
+              onStatusChange(application.id, newStatus);
+            }
           }}
-          className="shrink-0 text-xs font-medium rounded-full border px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer max-w-[110px] truncate"
-          style={{
-            backgroundColor: (STATUS_COLUMNS.find((c) => c.id === application.status)?.color) || '#6b7280',
-            borderColor: (STATUS_COLUMNS.find((c) => c.id === application.status)?.color) || '#6b7280',
-            color: '#fff',
-          }}
+          className="shrink-0 text-[10px] font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-500 cursor-pointer max-w-[85px] truncate"
         >
           {STATUS_COLUMNS.map((col) => (
-            <option key={col.id} value={col.id} style={{ backgroundColor: '#fff', color: '#111827' }}>
+            <option key={col.id} value={col.id}>
               {col.label}
             </option>
           ))}
         </select>
       </div>
 
-      {application.location && (
-        <div className="text-xs text-gray-400 mt-2 truncate">
-          {application.location}
+      {/* Metadata Chips: Location or Salary */}
+      {(application.location || application.salary) && (
+        <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-500">
+          {application.location && (
+            <span className="inline-flex items-center gap-1 truncate max-w-[130px] bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
+              <svg className="w-2.5 h-2.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span className="truncate">{application.location}</span>
+            </span>
+          )}
+          {application.salary && (
+            <span className="inline-flex items-center gap-0.5 font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+              {application.salary}
+            </span>
+          )}
         </div>
       )}
-      <div className="mt-2 flex justify-end">
+
+      {/* Action Footer */}
+      <div className="mt-2.5 flex items-center justify-between text-[11px]">
+        <span className="text-[10px] text-slate-400 flex items-center gap-1">
+          <svg className="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          {application.appliedDate
+            ? new Date(application.appliedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+            : 'Active'}
+        </span>
         <Link
           to={`/applications/${application.id}`}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
-          className="text-xs text-primary-600 hover:text-primary-700 hover:underline font-medium"
+          className="inline-flex items-center gap-0.5 text-primary-700 hover:text-primary-800 font-semibold text-xs hover:underline cursor-pointer"
         >
           View
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
         </Link>
       </div>
     </div>

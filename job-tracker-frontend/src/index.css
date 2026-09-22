@@ -2,12 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-primary: #0369a1;
+  --color-secondary: #0ea5e9;
+  --color-accent: #16a34a;
+  --color-background: #f8fafc;
+  --color-card: #ffffff;
+  --color-border: #e2e8f0;
+  --color-muted: #64748b;
+}
+
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
-  background-color: #f9fafb;
-  color: #111827;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--color-background);
+  color: #0f172a;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
 #root {
@@ -18,7 +29,7 @@ body {
 
 /* Status color helpers */
 .status-badge {
-  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium tracking-wide;
 }
 
 /* Loading spinner */
@@ -26,7 +37,7 @@ body {
   @apply animate-spin rounded-full h-8 w-8 border-4 border-primary-200 border-t-primary-600;
 }
 
-/* Accessibility */
+/* Accessibility & Focus Rings */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -38,7 +49,20 @@ body {
   white-space: nowrap;
   border-width: 0;
 }
+
 *:focus-visible {
-  outline: 2px solid #2563eb;
+  outline: 2px solid #0284c7;
   outline-offset: 2px;
+}
+
+/* Smooth motion & reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
