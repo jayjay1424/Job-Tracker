@@ -1,4 +1,7 @@
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
+if (!process.env.DATABASE_URL && (process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL)) {
+  process.env.DATABASE_URL = process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL;
+}
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');

@@ -1,7 +1,7 @@
 {
   "version": 2,
   "framework": null,
-  "buildCommand": "npm run build --prefix job-tracker-frontend && npm run db:generate --prefix job-tracker-backend",
+  "buildCommand": "npm run build --prefix job-tracker-frontend && npm run db:generate --prefix job-tracker-backend && (npm run db:push --prefix job-tracker-backend || true)",
   "outputDirectory": "job-tracker-frontend/dist",
   "installCommand": "npm install --prefix job-tracker-backend && npm install --prefix job-tracker-frontend",
   "rewrites": [
