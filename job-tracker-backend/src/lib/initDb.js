@@ -62,3 +62,4 @@ async function ensureTablesExist(prisma) {
 }
 
 module.exports = { ensureTablesExist };
+

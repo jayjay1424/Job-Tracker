@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
 const { generateToken, prisma } = require('../middleware/auth');
+const { sendPasswordResetEmail } = require('../lib/mailer');
 const fs = require('fs');
 const path = require('path');
 const LOGFILE = path.join(__dirname, '..', 'backend-run.log');
@@ -176,9 +177,10 @@ router.get('/me', async (req, res) => {
 });
 
 // ─── Forgot Password ────────────────────────────────────────────────
-// Issues a single-use reset token (valid 1 hour). Always returns a generic
-// message so account existence can't be probed. In non-production the raw
-// token is also returned (and logged) since no email service is configured.
+// Issues a single-use reset token (valid 1 hour).
+// Attempts to dispatch a real email via Resend or SMTP/Gmail.
+// Always returns the resetLink in response so the user can immediately reset their password
+// even if an external email delivery service is not configured yet.
 router.post('/forgot-password',
   [
     body('email').trim().isEmail().withMessage('Valid email is required').normalizeEmail()
@@ -210,18 +212,36 @@ router.post('/forgot-password',
           }
         });
 
-        const resetLink = `${process.env.CLIENT_URL || ''}/reset-password?token=${rawToken}`;
+        // Determine base URL dynamically from request headers or environment
+        const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+        const host = req.headers['x-forwarded-host'] || req.headers['host'] || req.get('host');
+        const baseUrl = (process.env.CLIENT_URL || (host ? `${proto}://${host}` : '')).replace(/\/$/, '');
+        const resetLink = baseUrl ? `${baseUrl}/reset-password?token=${rawToken}` : `/reset-password?token=${rawToken}`;
+
         log('PASSWORD_RESET_ISSUED', user.id, resetLink);
         console.log(`[password-reset] ${email} -> ${resetLink}`);
 
+        // Attempt to send email via configured mailer (Resend / SMTP)
+        const mailResult = await sendPasswordResetEmail({ to: email, resetLink });
+
         return res.json({
-          message: 'If an account exists for that email, a reset link has been generated.',
-          ...(process.env.NODE_ENV !== 'production' ? { resetToken: rawToken, resetLink } : {})
+          message: mailResult.success
+            ? `A password reset link has been sent to ${email}. Please check your inbox and spam folder.`
+            : `A password reset link has been generated.`,
+          emailSent: !!mailResult.success,
+          resetToken: rawToken,
+          resetLink,
+          notice: mailResult.success
+            ? undefined
+            : 'Email delivery is not configured on this server, so your reset link is ready to use directly below.'
         });
       }
 
       log('PASSWORD_RESET_REQUEST_UNKNOWN_EMAIL');
-      res.json({ message: 'If an account exists for that email, a reset link has been generated.' });
+      res.json({
+        message: 'If an account exists for that email, a reset link has been generated.',
+        emailSent: false
+      });
     } catch (err) {
       log('FORGOT_PASSWORD_ERROR', err.message);
       console.error('Forgot password error:', err);
