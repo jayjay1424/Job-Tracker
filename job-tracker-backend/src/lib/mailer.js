@@ -34,7 +34,7 @@ function createTransporter() {
  * Sends an email via Resend REST API if RESEND_API_KEY is present.
  */
 async function sendViaResend({ to, subject, html, text }) {
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = (process.env.RESEND_API_KEY || '').trim();
   if (!apiKey) return null;
 
   const from = process.env.EMAIL_FROM || 'Job Tracker <onboarding@resend.dev>';
@@ -166,3 +166,4 @@ module.exports = {
   sendPasswordResetEmail,
   createTransporter
 };
+
