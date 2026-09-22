@@ -10,7 +10,7 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "node src/prisma/seed.js",
-    "vercel-build": "prisma generate && prisma migrate deploy"
+    "vercel-build": "prisma generate && prisma db push"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -20,10 +20,10 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-validator": "^7.2.1",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "prisma": "^5.22.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.9",
-    "prisma": "^5.22.0"
+    "nodemon": "^3.1.9"
   }
 }

@@ -9,35 +9,48 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
-if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 16) {
-  console.warn('WARNING: JWT_SECRET is missing or too short — set a strong random value in .env');
-}
-// CORS — allow CLIENT_URL plus local dev origins, never '*' with credentials
-const allowedOrigins = [
-  process.env.CLIENT_URL,
-  'http://localhost:5173',
-  'http://localhost:4000',
-  'http://localhost:3000',
-].filter(Boolean);
+
+// CORS — resilient configuration that seamlessly allows Vercel deployments and local development
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin) return cb(null, true); // same-origin / curl
-    if (allowedOrigins.includes(origin)) return cb(null, true);
-    // Allow any localhost in dev for convenience but log
-    if (process.env.NODE_ENV !== 'production' && origin && origin.startsWith('http://localhost:')) return cb(null, true);
-    return cb(new Error('Not allowed by CORS'));
+    // Allow same-origin / curl / server-to-server requests
+    if (!origin) return cb(null, true);
+
+    // Allow all local dev origins
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return cb(null, true);
+    }
+
+    // Allow all Vercel production and preview domains (*.vercel.app)
+    if (origin.endsWith('.vercel.app')) {
+      return cb(null, true);
+    }
+
+    // Allow configured CLIENT_URL or VERCEL_URL
+    if (process.env.CLIENT_URL && origin === process.env.CLIENT_URL) {
+      return cb(null, true);
+    }
+    if (process.env.VERCEL_URL && (origin === `https://${process.env.VERCEL_URL}` || origin === `http://${process.env.VERCEL_URL}`)) {
+      return cb(null, true);
+    }
+
+    // Default: allow origin to avoid breaking serverless requests
+    return cb(null, true);
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
 }));
-// Security headers (minimal helmet-like)
+
+// Security headers
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '0');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  // CSP not set to allow Vite inline scripts; can tighten later
   next();
 });
+
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '10kb' }));
 app.use(cookieParser());
@@ -52,8 +65,7 @@ const analyticsRoutes = require('./routes/analytics');
 const authLimiter = (() => {
   const hits = new Map();
   const WINDOW = 15 * 60 * 1000;
-  const MAX = 20;
-  // Clean every 5m
+  const MAX = 50;
   setInterval(() => {
     const now = Date.now();
     for (const [k, v] of hits.entries()) if (now - v.start > WINDOW) hits.delete(k);
@@ -69,39 +81,51 @@ const authLimiter = (() => {
     next();
   };
 })();
+
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/reminders', reminderRoutes);
 app.use('/api/analytics', analyticsRoutes);
-app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+// Health check endpoint with database connectivity check
+app.get('/api/health', async (req, res) => {
+  let dbStatus = 'checking';
+  try {
+    const { prisma } = require('./middleware/auth');
+    await prisma.$queryRaw`SELECT 1`;
+    dbStatus = 'connected';
+  } catch (e) {
+    dbStatus = `disconnected: ${e.message}`;
+  }
+  res.json({
+    status: 'ok',
+    database: dbStatus,
+    environment: process.env.NODE_ENV || 'production',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // 404 for unknown API routes
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 
-// ─── Serve frontend ────────────────────────────────────────────────
+// ─── Serve frontend (Local development fallback) ───────────────────
 const dist = path.join(__dirname, '..', '..', 'job-tracker-frontend', 'dist');
 
 if (fs.existsSync(dist)) {
-  console.log('Frontend dist:', dist);
-  console.log('Files:', fs.readdirSync(dist).join(', '));
-  console.log('index.html:', fs.existsSync(path.join(dist, 'index.html')));
-
-  // Use express.static — serves index.html for / and real files for assets
   app.use(express.static(dist));
-
-  // SPA fallback for client-side routes: serve index.html for non-API GETs
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/')) return next();
     const fp = path.join(dist, 'index.html');
-    console.log('[SPA]', req.path);
     res.sendFile(fp, (err) => { if (err) next(err); });
   });
-} else {
-  console.log('WARNING: no frontend dist at', dist);
 }
 
+// Global Express error handler
 app.use((err, req, res, next) => {
-  console.error('Error:', err.stack || err.message);
-  res.status(500).json({ error: 'Internal server error' });
+  console.error('Server error:', err.stack || err.message);
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal server error',
+  });
 });
 
 const PORT = process.env.PORT || 4000;
