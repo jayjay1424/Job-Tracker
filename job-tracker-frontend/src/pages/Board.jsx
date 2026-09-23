@@ -259,22 +259,26 @@ export default function Board() {
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-          {/* Kanban Columns Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5 items-start">
+          {/* Kanban Columns Responsive Track */}
+          <div className="flex gap-3.5 overflow-x-auto pb-4 pt-1 items-start custom-scrollbar">
             {STATUS_COLUMNS.map((column) => (
-              <Column
+              <div
                 key={column.id}
-                column={column}
-                applications={grouped[column.id] || []}
-                onStatusChange={handleStatusChange}
-                onCreated={fetchApplications}
-              />
+                className="w-[280px] sm:w-[290px] xl:w-auto xl:flex-1 xl:min-w-[250px] shrink-0 xl:shrink"
+              >
+                <Column
+                  column={column}
+                  applications={grouped[column.id] || []}
+                  onStatusChange={handleStatusChange}
+                  onCreated={fetchApplications}
+                />
+              </div>
             ))}
           </div>
 
           <DragOverlay>
             {activeApplication && (
-              <div className="bg-white rounded-xl shadow-card-hover p-3.5 border-2 border-primary-500 scale-105 rotate-1 opacity-95">
+              <div className="bg-white rounded-xl shadow-card-hover p-3.5 border-2 border-primary-500 scale-105 rotate-1 opacity-95 w-[280px]">
                 <div className="font-semibold text-xs text-slate-900 truncate">
                   {activeApplication.company}
                 </div>
@@ -332,14 +336,14 @@ function Column({ column, applications, onStatusChange, onCreated }) {
   return (
     <div
       ref={setNodeRef}
-      className={`rounded-2xl p-2.5 border transition-all duration-150 flex flex-col min-h-[300px] ${
+      className={`rounded-2xl p-2.5 border transition-all duration-150 flex flex-col h-[calc(100vh-215px)] min-h-[500px] max-h-[840px] shadow-2xs ${
         isOver
           ? 'bg-sky-50/80 border-primary-400 ring-2 ring-primary-300 ring-offset-1'
           : 'bg-slate-100/70 border-slate-200/90'
       }`}
     >
-      {/* Column Header */}
-      <div className="flex items-center justify-between gap-1 mb-2.5 px-1 pt-0.5">
+      {/* Column Header (Pinned) */}
+      <div className="shrink-0 flex items-center justify-between gap-1 mb-2 px-1 pt-0.5">
         <div className="flex items-center gap-2">
           <span
             className="w-2.5 h-2.5 rounded-full ring-2 ring-white shadow-xs shrink-0"
@@ -350,19 +354,19 @@ function Column({ column, applications, onStatusChange, onCreated }) {
           </h2>
         </div>
         <span
-          className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white border border-slate-200/90 text-slate-600 shadow-subtle"
+          className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white border border-slate-200/90 text-slate-600 shadow-2xs"
           title={`${applications.length} applications in ${column.label}`}
         >
           {applications.length}
         </span>
       </div>
 
-      {/* Cards List */}
+      {/* Cards List - Independent vertical scroll per column */}
       <SortableContext
         items={applications.map((a) => a.id)}
         strategy={verticalListSortingStrategy}
       >
-        <div className="space-y-2 min-h-[50px] flex-1">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden pr-1 space-y-2.5 custom-scrollbar min-h-0">
           {applications.map((app) => (
             <SortableCard
               key={app.id}
@@ -373,79 +377,82 @@ function Column({ column, applications, onStatusChange, onCreated }) {
           ))}
 
           {applications.length === 0 && !showForm && (
-            <div className="border border-dashed border-slate-300/80 rounded-xl py-6 px-3 text-center">
+            <div className="h-32 border border-dashed border-slate-300/80 rounded-xl flex flex-col items-center justify-center text-center p-3">
+              <span className="text-base text-slate-300 mb-1">📋</span>
               <p className="text-[11px] text-slate-400 font-medium">Empty stage</p>
             </div>
           )}
         </div>
       </SortableContext>
 
-      {/* Quick Add Form or Trigger */}
-      {showForm ? (
-        <form
-          onSubmit={handleQuickAdd}
-          onKeyDown={handleKeyDown}
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-          className="mt-2.5 bg-white rounded-xl border border-slate-200 p-2.5 space-y-2 shadow-card"
-        >
-          <input
-            autoFocus
-            type="text"
-            placeholder="Company name *"
-            value={form.company}
-            onChange={(e) => setForm((p) => ({ ...p, company: e.target.value }))}
-            className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-            required
-          />
-          <input
-            type="text"
-            placeholder="Job role / title *"
-            value={form.jobTitle}
-            onChange={(e) => setForm((p) => ({ ...p, jobTitle: e.target.value }))}
-            className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-            required
-          />
-          <input
-            type="text"
-            placeholder="Location (optional)"
-            value={form.location}
-            onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))}
-            className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-          />
-          {err && (
-            <div className="text-[11px] text-rose-600 bg-rose-50 border border-rose-100 rounded px-2 py-1">
-              {err}
+      {/* Quick Add Form or Trigger (Pinned at bottom) */}
+      <div className="shrink-0 pt-2 border-t border-slate-200/60 mt-1.5">
+        {showForm ? (
+          <form
+            onSubmit={handleQuickAdd}
+            onKeyDown={handleKeyDown}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="bg-white rounded-xl border border-slate-200 p-2.5 space-y-2 shadow-card"
+          >
+            <input
+              autoFocus
+              type="text"
+              placeholder="Company name *"
+              value={form.company}
+              onChange={(e) => setForm((p) => ({ ...p, company: e.target.value }))}
+              className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              required
+            />
+            <input
+              type="text"
+              placeholder="Job role / title *"
+              value={form.jobTitle}
+              onChange={(e) => setForm((p) => ({ ...p, jobTitle: e.target.value }))}
+              className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+              required
+            />
+            <input
+              type="text"
+              placeholder="Location (optional)"
+              value={form.location}
+              onChange={(e) => setForm((p) => ({ ...p, location: e.target.value }))}
+              className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
+            />
+            {err && (
+              <div className="text-[11px] text-rose-600 bg-rose-50 border border-rose-100 rounded px-2 py-1">
+                {err}
+              </div>
+            )}
+            <div className="flex gap-1.5 pt-0.5">
+              <button
+                type="submit"
+                disabled={submitting}
+                className="flex-1 py-1 bg-primary-700 hover:bg-primary-800 text-white text-xs font-semibold rounded-lg shadow-xs disabled:opacity-50 transition cursor-pointer"
+              >
+                {submitting ? 'Adding…' : 'Add'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForm(false);
+                  setErr('');
+                }}
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-medium rounded-lg transition cursor-pointer"
+              >
+                Cancel
+              </button>
             </div>
-          )}
-          <div className="flex gap-1.5 pt-0.5">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="flex-1 py-1 bg-primary-700 hover:bg-primary-800 text-white text-xs font-semibold rounded-lg shadow-xs disabled:opacity-50 transition cursor-pointer"
-            >
-              {submitting ? 'Adding…' : 'Add'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowForm(false);
-                setErr('');
-              }}
-              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-medium rounded-lg transition cursor-pointer"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      ) : (
-        <button
-          onClick={() => setShowForm(true)}
-          className="mt-2.5 w-full py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-white border border-dashed border-slate-300 hover:border-slate-400 rounded-xl transition flex items-center justify-center gap-1 cursor-pointer font-medium"
-        >
-          <span className="text-sm leading-none font-bold">+</span> Quick add
-        </button>
-      )}
+          </form>
+        ) : (
+          <button
+            onClick={() => setShowForm(true)}
+            className="w-full py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-white border border-dashed border-slate-300 hover:border-slate-400 rounded-xl transition flex items-center justify-center gap-1 cursor-pointer font-medium"
+          >
+            <span className="text-sm leading-none font-bold">+</span> Quick add
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -468,30 +475,44 @@ function SortableCard({ application, onStatusChange }) {
 
   const companyInitial = (application.company?.[0] || 'C').toUpperCase();
 
+  // Clean salary display formatting
+  const formatSalary = (val) => {
+    if (!val) return null;
+    const trimmed = String(val).trim();
+    if (!trimmed) return null;
+    // If it's a raw number, format with currency
+    const num = Number(trimmed.replace(/,/g, ''));
+    if (!isNaN(num) && num > 0) {
+      return `₱${num.toLocaleString()}`;
+    }
+    return trimmed;
+  };
+
+  const formattedSalary = formatSalary(application.salary);
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
-      className="group bg-white rounded-xl border border-slate-200/90 p-3 shadow-card hover:shadow-card-hover transition-all duration-150 cursor-grab active:cursor-grabbing relative"
+      className="group bg-white rounded-xl border border-slate-200/90 p-3 shadow-card hover:shadow-card-hover transition-all duration-150 cursor-grab active:cursor-grabbing relative hover:border-slate-300"
     >
-      <div className="flex items-start justify-between gap-2 mb-1.5">
+      {/* Top Header: Company Avatar + Company Name + Stage Selector */}
+      <div className="flex items-center justify-between gap-2 mb-1">
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <div className="w-6 h-6 rounded-md bg-sky-100 text-primary-800 flex items-center justify-center text-[10px] font-bold shrink-0 border border-sky-200/60">
+          <div className="w-6 h-6 rounded-md bg-gradient-to-br from-sky-100 to-indigo-100 text-primary-800 flex items-center justify-center text-[10px] font-bold shrink-0 border border-sky-200/60 shadow-2xs">
             {companyInitial}
           </div>
-          <div className="min-w-0 flex-1">
-            <h3 className="font-semibold text-xs text-slate-900 truncate leading-tight">
-              {application.company}
-            </h3>
-            <p className="text-[11px] text-slate-500 truncate font-normal">
-              {application.jobTitle}
-            </p>
-          </div>
+          <h3
+            className="font-semibold text-xs text-slate-900 truncate leading-tight flex-1"
+            title={application.company}
+          >
+            {application.company}
+          </h3>
         </div>
 
-        {/* Accessible Single-pointer / Keyboard alternative to dragging (WCAG 2.2 AA) */}
+        {/* Accessible Stage Selector Dropdown */}
         <select
           value={application.status}
           aria-label={`Change stage for ${application.company} ${application.jobTitle}`}
@@ -504,7 +525,7 @@ function SortableCard({ application, onStatusChange }) {
               onStatusChange(application.id, newStatus);
             }
           }}
-          className="shrink-0 text-[10px] font-semibold rounded-md border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-500 cursor-pointer max-w-[85px] truncate"
+          className="shrink-0 text-[10px] font-medium rounded-md border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-600 px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-500 cursor-pointer max-w-[85px] truncate transition shadow-2xs"
         >
           {STATUS_COLUMNS.map((col) => (
             <option key={col.id} value={col.id}>
@@ -514,11 +535,22 @@ function SortableCard({ application, onStatusChange }) {
         </select>
       </div>
 
+      {/* Role / Job Title: Full width line aligned under company name */}
+      <p
+        className="text-[11px] font-medium text-slate-600 truncate pl-8 mb-2 leading-snug"
+        title={application.jobTitle}
+      >
+        {application.jobTitle}
+      </p>
+
       {/* Metadata Chips: Location or Salary */}
-      {(application.location || application.salary) && (
-        <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-500">
+      {(application.location || formattedSalary) && (
+        <div className="flex flex-wrap items-center gap-1.5 mb-2.5 pt-1.5 border-t border-slate-100 text-[10px]">
           {application.location && (
-            <span className="inline-flex items-center gap-1 truncate max-w-[130px] bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
+            <span
+              className="inline-flex items-center gap-1 bg-slate-50 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200/60 truncate max-w-[150px]"
+              title={application.location}
+            >
               <svg className="w-2.5 h-2.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -526,19 +558,19 @@ function SortableCard({ application, onStatusChange }) {
               <span className="truncate">{application.location}</span>
             </span>
           )}
-          {application.salary && (
-            <span className="inline-flex items-center gap-0.5 font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
-              {application.salary}
+          {formattedSalary && (
+            <span className="inline-flex items-center gap-0.5 font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/70">
+              {formattedSalary}
             </span>
           )}
         </div>
       )}
 
       {/* Action Footer */}
-      <div className="mt-2.5 flex items-center justify-between text-[11px]">
-        <span className="text-[10px] text-slate-400 flex items-center gap-1">
+      <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1.5 border-t border-slate-100/80">
+        <span className="flex items-center gap-1">
           <svg className="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
           {application.appliedDate
             ? new Date(application.appliedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -548,7 +580,7 @@ function SortableCard({ application, onStatusChange }) {
           to={`/applications/${application.id}`}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
-          className="inline-flex items-center gap-0.5 text-primary-700 hover:text-primary-800 font-semibold text-xs hover:underline cursor-pointer"
+          className="inline-flex items-center gap-0.5 text-primary-700 hover:text-primary-800 font-semibold hover:underline cursor-pointer group-hover:translate-x-0.5 transition-transform"
         >
           View
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
